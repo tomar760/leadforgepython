@@ -229,7 +229,7 @@
               <div class="relative"><div class="w-2 h-2 rounded-full" style="background:var(--signal);"></div></div>
               <div>
                 <div class="text-sm font-semibold text-white">Activity Feed</div>
-                <div class="text-[10px] text-slate-500 uppercase tracking-widest">Preview · example output</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-widest">Mixed — [LIVE] entries are real, rest is preview</div>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -276,7 +276,7 @@
           <div class="space-y-3 text-sm">
             <div class="flex items-center gap-3"><span style="color:var(--signal);">✓</span><span class="text-slate-300">Dashboard shell (this)</span></div>
             <div class="flex items-center gap-3"><span id="roadmapGeminiIcon" style="color:var(--pending);">○</span><span id="roadmapGeminiText" class="text-slate-400">Gemini connection</span></div>
-            <div class="flex items-center gap-3"><span class="text-slate-600">○</span><span class="text-slate-500">8 agent backends (Python)</span></div>
+            <div class="flex items-center gap-3"><span style="color:var(--pending);">◐</span><span class="text-slate-300">8 agent backends — 2/8 live (Growth Hacker, Content)</span></div>
             <div class="flex items-center gap-3"><span class="text-slate-600">○</span><span class="text-slate-500">Compliant lead channels — in discussion</span></div>
             <div class="flex items-center gap-3"><span class="text-slate-600">○</span><span class="text-slate-500">Approval Queue automation</span></div>
           </div>
@@ -393,10 +393,6 @@ const logTemplates = [
     'Keyword "free ATS resume checker" moved up to rank #8.',
     'Generated meta description for /blog/fresher-resume-tips.',
     'Flagged a new competitor for tracking.',
-  ]},
-  { agent:'growth', color:'#c084fc', tag:'Growth Hacker', msgs:[
-    'Sketched a referral loop: 3 referrals unlocks a premium template.',
-    'Drafted a value-first r/developersIndia post idea.',
   ]},
   { agent:'support', color:'#f472b6', tag:'Support', msgs:[
     'Drafted a reply for a download-issue ticket — awaiting approval.',
@@ -592,8 +588,34 @@ function saveBackendUrl(){
   backendUrl = val;
   statusEl.textContent='Checking…'; statusEl.style.color='var(--ink-400)';
   pollBackendStatus();
+  pollActivity();
   if(pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(pollBackendStatus, 8000);
+  pollTimer = setInterval(()=>{ pollBackendStatus(); pollActivity(); }, 8000);
+}
+
+const seenActivityKeys = new Set();
+async function pollActivity(){
+  if(!backendUrl) return;
+  try{
+    const res = await fetch(backendUrl + '/activity');
+    if(!res.ok) return;
+    const entries = await res.json();
+    // oldest-first so they append in the right order
+    [...entries].reverse().forEach(e=>{
+      const key = e.time + e.agent + e.text.slice(0,20);
+      if(seenActivityKeys.has(key)) return;
+      seenActivityKeys.add(key);
+      const line = document.createElement('div');
+      line.className = 'log-line flex gap-2 items-start';
+      line.dataset.agent = e.agent;
+      const providerTag = e.provider && e.provider!=='none' ? ` <span style="color:var(--signal)">[LIVE·${e.provider}]</span>` : ' <span style="color:var(--alert)">[failed]</span>';
+      line.innerHTML = `<span class="text-slate-600 shrink-0">${e.time}</span><span class="font-semibold shrink-0 min-w-[100px]" style="color:#c084fc;">[${e.label}]</span><span class="text-slate-300">${e.text}${providerTag}</span>`;
+      feed.appendChild(line);
+      feedCount++;
+    });
+    document.getElementById('feedCount').textContent = feedCount;
+    while(feed.children.length>60) feed.removeChild(feed.firstChild);
+  }catch(err){ /* backend not reachable yet — fake feed keeps the UI alive */ }
 }
 
 function setEngineState(tone,text){
@@ -636,6 +658,7 @@ async function pollBackendStatus(){
   }
 }
 pollBackendStatus();
+pollActivity();
 
 async function testRealAgentRun(){
   const btn = document.getElementById('testAgentRunBtn');
