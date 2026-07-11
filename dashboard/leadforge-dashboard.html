@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LeadForge — AI Command Center · banaocv.in</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#06070a; --panel:rgba(13,16,22,.66); --border-glass:rgba(255,255,255,.07);
+    --signal:#34e8a0; --signal-dim:rgba(52,232,160,.12);
+    --intel:#7c93ff; --intel-dim:rgba(124,147,255,.12);
+    --pending:#ffb84d; --pending-dim:rgba(255,184,77,.12);
+    --alert:#ff5d74; --alert-dim:rgba(255,93,116,.12);
+    --nvidia:#76b900; --nvidia-dim:rgba(118,185,0,.12);
+    --ink-100:#e8ecf1; --ink-400:#93a0b4; --ink-600:#5b6577;
+  }
+  *{-webkit-font-smoothing:antialiased;}
+  body{
+    font-family:'Inter',system-ui,sans-serif; background:var(--void); color:var(--ink-100); min-height:100vh;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 12% -10%, rgba(124,147,255,.10), transparent),
+      radial-gradient(ellipse 60% 45% at 100% 5%, rgba(52,232,160,.07), transparent);
+    background-attachment:fixed;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .grid-bg{background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px;}
+  .glass{background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--border-glass);}
+  .glass-hover:hover{background:rgba(20,24,33,.8);border-color:rgba(255,255,255,.12);}
+  .scrollbar-thin::-webkit-scrollbar{width:6px;height:6px;}
+  .scrollbar-thin::-webkit-scrollbar-track{background:transparent;}
+  .scrollbar-thin::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px;}
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.16);}
+  @keyframes ping-soft{75%,100%{transform:scale(1.7);opacity:0;}}
+  .status-active{position:relative;}
+  .status-active::before{content:'';position:absolute;inset:-3px;border-radius:50%;background:var(--signal);opacity:.4;animation:ping-soft 2s cubic-bezier(0,0,.2,1) infinite;}
+  @keyframes slideIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
+  .log-line{animation:slideIn .3s ease-out;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+  .cursor-blink::after{content:'▌';color:var(--signal);animation:blink 1s step-end infinite;margin-left:2px;}
+  .btn-glow{border:1px solid; transition:all .18s ease;}
+  .btn-signal{background:linear-gradient(135deg,var(--signal-dim),rgba(52,232,160,.03));border-color:rgba(52,232,160,.3);color:var(--signal);}
+  .btn-signal:hover{box-shadow:0 0 18px rgba(52,232,160,.25);transform:translateY(-1px);}
+  .btn-intel{background:linear-gradient(135deg,var(--intel-dim),rgba(124,147,255,.03));border-color:rgba(124,147,255,.3);color:var(--intel);}
+  .btn-intel:hover{box-shadow:0 0 18px rgba(124,147,255,.25);}
+  .btn-alert{background:linear-gradient(135deg,var(--alert-dim),rgba(255,93,116,.03));border-color:rgba(255,93,116,.3);color:#ff8b9c;}
+  .btn-alert:hover{box-shadow:0 0 18px rgba(255,93,116,.2);}
+  .shepherd-card{background:linear-gradient(135deg, rgba(124,147,255,.10), rgba(124,147,255,.02));border:1px solid rgba(124,147,255,.28);}
+  .hierarchy-line{border-left:2px dashed rgba(124,147,255,.25); margin-left:19px;}
+  .sparkline{stroke-dasharray:600;stroke-dashoffset:600;animation:draw 1.6s ease-out forwards;}
+  @keyframes draw{to{stroke-dashoffset:0;}}
+  #settingsModal{transition:opacity .2s ease;}
+  .modal-panel{transition:transform .25s cubic-bezier(.2,.9,.3,1),opacity .25s ease;}
+  @media (max-width:1023px){.sidebar{transform:translateX(-100%);transition:transform .3s;}.sidebar.open{transform:translateX(0);}}
+</style>
+</head>
+<body>
+<div class="grid-bg min-h-screen">
+
+  <!-- TOP BAR -->
+  <header class="glass sticky top-0 z-40 border-b border-white/5">
+    <div class="flex items-center justify-between px-4 lg:px-8 py-3.5">
+      <div class="flex items-center gap-3">
+        <button id="mobileMenuBtn" class="lg:hidden p-2 rounded-lg hover:bg-white/5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,var(--intel),var(--signal));">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v4h-7V4zm0 6h7v10h-7V10zM4 13h7v7H4v-7z"/></svg>
+          </div>
+          <div>
+            <div class="text-sm font-semibold tracking-tight text-white">LEADFORGE</div>
+            <div class="text-[10px] text-slate-500 tracking-widest uppercase">for banaocv.in</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="statusPill" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5">
+        <div id="statusDot" class="w-1.5 h-1.5 rounded-full" style="background:var(--pending);"></div>
+        <span id="statusText" class="text-xs text-slate-400">Awaiting Gemini key</span>
+        <span class="text-xs text-slate-600">•</span>
+        <span class="text-xs text-slate-500 mono" id="clock">--:--:--</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="openSettings()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-xs text-slate-300 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <span class="hidden sm:inline">Settings</span>
+        </button>
+        <div class="flex items-center gap-2 pl-2 border-l border-white/5">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:linear-gradient(135deg,#a78bfa,#f472b6);">AD</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar fixed lg:sticky top-[65px] left-0 z-30 w-72 h-[calc(100vh-65px)] glass border-r border-white/5 overflow-y-auto scrollbar-thin">
+      <div class="p-5">
+        <div class="text-[10px] uppercase tracking-widest text-slate-500 mb-3">The LeadForge Team</div>
+        <div id="agentList" class="space-y-2"></div>
+
+        <div class="my-6 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+        <div class="text-[10px] uppercase tracking-widest text-slate-500 mb-3">AI Engine</div>
+        <div id="engineBadge" class="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg border transition-all duration-500" style="background:var(--pending-dim);border-color:rgba(255,184,77,.25);">
+          <div id="engineDot" class="w-2 h-2 rounded-full shrink-0 transition-colors duration-500" style="background:var(--pending);"></div>
+          <span id="engineLabel" class="text-xs font-medium transition-colors duration-500" style="color:var(--pending);">Backend not connected yet</span>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Gemini (primary)</span>
+              <span id="geminiReqCounter" class="mono" style="color:var(--intel);">— / 1,500</span>
+            </div>
+            <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div id="geminiReqBar" class="h-full rounded-full transition-all duration-700" style="width:0%;background:var(--intel);"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">NVIDIA (fallback)</span>
+              <span id="nvidiaReqCounter" class="mono" style="color:var(--nvidia);">0 requests</span>
+            </div>
+            <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div id="nvidiaReqBar" class="h-full rounded-full transition-all duration-700" style="width:0%;background:var(--nvidia);"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Agents built</span>
+              <span class="text-slate-300 mono">1 / 8</span>
+            </div>
+            <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div class="h-full rounded-full" style="width:12.5%;background:var(--signal);"></div>
+            </div>
+          </div>
+          <div class="flex justify-between text-xs pt-2 border-t border-white/5">
+            <span class="text-slate-400">Tokens used today</span>
+            <span id="tokenCounter" class="text-slate-300 mono">0</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 p-4 lg:p-8 min-w-0">
+
+      <div class="glass rounded-xl p-4 mb-6 flex items-start gap-3 border" style="border-color:rgba(255,184,77,.25);">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:var(--pending-dim);">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--pending);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="text-sm text-slate-300">
+          <span class="font-semibold text-white">Preview mode.</span> Nothing below is live yet — it shows the shape of what LeadForge will track once it's built. Add your Gemini key in <button onclick="openSettings()" class="underline hover:text-white" style="color:var(--intel);">Settings</button> to bring Project Shepherd online.
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-[10px] uppercase tracking-widest font-semibold" style="color:var(--intel);">Compliant channels only</span>
+            <span class="w-1 h-1 rounded-full bg-slate-600"></span>
+            <span class="text-[10px] text-slate-500">No scraping, no cold DMs</span>
+          </div>
+          <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">Good to see you, Aditya</h1>
+          <p class="text-sm text-slate-400 mt-1">Your 8-agent team for banaocv.in, once live.</p>
+        </div>
+        <button onclick="openSettings()" class="btn-glow btn-signal px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Connect Gemini Key
+        </button>
+      </div>
+
+      <!-- KPI -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--signal-dim);">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--signal);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            </div>
+            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" style="color:var(--signal);background:var(--signal-dim);">opt-in only</span>
+          </div>
+          <div class="text-xs text-slate-500 mb-1">Leads Captured</div>
+          <div class="text-3xl font-bold text-white tracking-tight" data-count="84">0</div>
+        </div>
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--pending-dim);">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--pending);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" style="color:var(--pending);background:var(--pending-dim);">needs you</span>
+          </div>
+          <div class="text-xs text-slate-500 mb-1">Awaiting Approval</div>
+          <div class="text-3xl font-bold text-white tracking-tight" id="pendingCount">4</div>
+        </div>
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--intel-dim);">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--intel);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            </div>
+            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" style="color:var(--intel);background:var(--intel-dim);">↑ 3</span>
+          </div>
+          <div class="text-xs text-slate-500 mb-1">Keywords Ranking (Top 20)</div>
+          <div class="text-3xl font-bold text-white tracking-tight" data-count="17">0</div>
+        </div>
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(167,139,250,.12);">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4"/></svg>
+            </div>
+            <span class="text-[10px] text-purple-300 bg-purple-400/10 px-2 py-0.5 rounded-full">new channel</span>
+          </div>
+          <div class="text-xs text-slate-500 mb-1">Placement Cells In Talks</div>
+          <div class="text-3xl font-bold text-white tracking-tight" data-count="3">0</div>
+        </div>
+      </div>
+
+      <!-- FEED + QUEUE -->
+      <div class="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-6">
+        <div class="glass rounded-xl xl:col-span-3 flex flex-col overflow-hidden" style="height:520px;">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <div class="flex items-center gap-3">
+              <div class="relative"><div class="w-2 h-2 rounded-full" style="background:var(--signal);"></div></div>
+              <div>
+                <div class="text-sm font-semibold text-white">Activity Feed</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-widest">Preview · example output</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="flex bg-white/5 rounded-lg p-0.5" id="feedTabs">
+                <button data-filter="all" class="feed-tab px-2.5 py-1 text-[11px] rounded-md text-white bg-white/10">All</button>
+                <button data-filter="shepherd" class="feed-tab px-2.5 py-1 text-[11px] rounded-md text-slate-400 hover:text-white">Shepherd</button>
+                <button data-filter="outreach" class="feed-tab px-2.5 py-1 text-[11px] rounded-md text-slate-400 hover:text-white">Outreach</button>
+                <button data-filter="seo" class="feed-tab px-2.5 py-1 text-[11px] rounded-md text-slate-400 hover:text-white">SEO</button>
+              </div>
+              <button id="pauseFeed" class="p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-400" title="Pause">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="activityFeed" class="flex-1 overflow-y-auto scrollbar-thin p-4 mono text-xs space-y-1.5"></div>
+          <div class="px-5 py-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-500">
+            <span><span id="feedCount">0</span> example events</span>
+            <span class="mono cursor-blink">shepherd@leadforge:~$</span>
+          </div>
+        </div>
+
+        <div id="approvalSection" class="glass rounded-xl xl:col-span-2 flex flex-col overflow-hidden" style="height:520px;">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:var(--pending-dim);">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" style="color:var(--pending);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>
+              </div>
+              <div>
+                <div class="text-sm font-semibold text-white">Approval Queue</div>
+                <div class="text-[10px] text-slate-500 uppercase tracking-widest">You approve, edit, or reject — always</div>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-1 rounded-full font-semibold" style="color:var(--pending);background:var(--pending-dim);"><span id="queueBadge">4</span> pending</span>
+          </div>
+          <div id="approvalQueue" class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- ROADMAP + PERFORMANCE -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div class="glass rounded-xl p-5 lg:col-span-2">
+          <div class="text-sm font-semibold text-white mb-1">Build Roadmap</div>
+          <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-4">What's actually done so far</div>
+          <div class="space-y-3 text-sm">
+            <div class="flex items-center gap-3"><span style="color:var(--signal);">✓</span><span class="text-slate-300">Dashboard shell (this)</span></div>
+            <div class="flex items-center gap-3"><span id="roadmapGeminiIcon" style="color:var(--pending);">○</span><span id="roadmapGeminiText" class="text-slate-400">Gemini connection</span></div>
+            <div class="flex items-center gap-3"><span class="text-slate-600">○</span><span class="text-slate-500">8 agent backends (Python)</span></div>
+            <div class="flex items-center gap-3"><span class="text-slate-600">○</span><span class="text-slate-500">Compliant lead channels — in discussion</span></div>
+            <div class="flex items-center gap-3"><span class="text-slate-600">○</span><span class="text-slate-500">Approval Queue automation</span></div>
+          </div>
+        </div>
+        <div class="glass rounded-xl p-5 lg:col-span-3">
+          <div class="text-sm font-semibold text-white mb-1">Performance</div>
+          <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-4">Will populate once agents start completing real tasks</div>
+          <div class="h-40 rounded-lg border border-dashed border-white/10 flex items-center justify-center text-center px-6">
+            <p class="text-xs text-slate-500">No runs yet — this chart fills in as soon as your first agent goes live.</p>
+          </div>
+        </div>
+      </div>
+
+      <footer class="mt-8 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 pb-4">
+        <div>LeadForge · built for banaocv.in · v0.1 (dashboard-only)</div>
+        <div>Hosting: Render (free) · LLM: Gemini (AI Studio, free)</div>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settingsModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(3,4,6,.7);backdrop-filter:blur(4px);">
+  <div class="modal-panel glass rounded-2xl w-full max-w-md p-6" style="transform:scale(.96);opacity:0;">
+    <div class="flex items-start justify-between mb-1">
+      <div>
+        <div class="text-sm font-semibold text-white">Connect Gemini</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Google AI Studio · free tier</div>
+      </div>
+      <button onclick="closeSettings()" class="p-1 text-slate-500 hover:text-white">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="text-xs text-slate-400 mt-3 leading-relaxed">Paste your free API key from <span class="mono text-slate-300">aistudio.google.com</span>. It's kept only in this browser tab's memory — never sent anywhere except directly to Google, and never saved to disk.</p>
+    <input id="geminiKeyInput" type="password" placeholder="AIza..." class="w-full mt-4 px-3 py-2.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white placeholder-slate-600 mono focus:outline-none focus:border-white/30" />
+    <button id="testConnectionBtn" onclick="testGeminiConnection()" class="btn-glow btn-signal w-full mt-3 px-4 py-2.5 rounded-lg text-sm font-medium">Test &amp; Activate</button>
+    <div id="settingsStatus" class="text-xs mt-3 min-h-[1rem]"></div>
+
+    <div class="h-px bg-white/10 my-4"></div>
+    <div class="text-sm font-semibold text-white">Backend URL</div>
+    <p class="text-[11px] text-slate-500 mt-1 mb-2">Paste your Render URL here once the backend is deployed (see README), to see which AI engine is live and today's usage.</p>
+    <input id="backendUrlInput" type="text" placeholder="https://leadforge-backend.onrender.com" class="w-full px-3 py-2.5 rounded-lg bg-black/30 border border-white/10 text-sm text-white placeholder-slate-600 mono focus:outline-none focus:border-white/30" />
+    <button onclick="saveBackendUrl()" class="btn-glow btn-intel w-full mt-3 px-4 py-2.5 rounded-lg text-sm font-medium">Save &amp; Check</button>
+    <div id="backendStatus" class="text-xs mt-3 min-h-[1rem]"></div>
+  </div>
+</div>
+
+<div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+<script>
+/* ---------- AGENTS ---------- */
+const agents = [
+  { id:'shepherd', name:'Project Shepherd', role:'Orchestrating the team', status:'standby', orchestrator:true, icon:'🧭' },
+  { id:'outreach', name:'Sales Outreach Specialist', role:'Drafting compliant outreach', status:'standby', icon:'✉️' },
+  { id:'growth', name:'Growth Hacker', role:'Zero-budget growth loops', status:'standby', icon:'🚀' },
+  { id:'seo', name:'SEO Specialist', role:'Ranking banaocv.in', status:'standby', icon:'📈' },
+  { id:'content', name:'Content & Social Strategist', role:'Scripting reels & posts', status:'standby', icon:'🎬' },
+  { id:'frontend', name:'Frontend Developer', role:'Shipping UI features', status:'standby', icon:'🛠️' },
+  { id:'data', name:'Data Extraction Agent', role:'Structuring opt-in leads', status:'standby', icon:'🗂️' },
+  { id:'support', name:'Customer Support Responder', role:'Drafting user replies', status:'standby', icon:'💬' },
+];
+const statusMap = {
+  active:{label:'Active',color:'var(--signal)'},
+  standby:{label:'Standby',color:'var(--ink-600)'},
+};
+function renderAgents(){
+  const shepherd = agents.find(a=>a.orchestrator);
+  const rest = agents.filter(a=>!a.orchestrator);
+  const cardHtml = (a) => {
+    const s = statusMap[a.status];
+    return `
+    <div class="agent-card ${a.orchestrator?'shepherd-card':'glass-hover border border-white/5'} rounded-lg p-3" data-agent="${a.id}">
+      <div class="flex items-start gap-3">
+        <div class="relative shrink-0">
+          <div class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-base">${a.icon}</div>
+          <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${a.status==='active'?'status-active':''}" style="background:${s.color};border-color:#0e1119;"></div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-sm font-medium text-white truncate">${a.name}</div>
+            <span class="text-[9px] font-semibold uppercase tracking-wider" style="color:${s.color};">${s.label}</span>
+          </div>
+          <div class="text-[11px] text-slate-500 truncate">${a.role}</div>
+          ${a.orchestrator?'<div class="text-[9px] uppercase tracking-widest mt-1" style="color:var(--intel);">Orchestrator</div>':''}
+        </div>
+      </div>
+    </div>`;
+  };
+  document.getElementById('agentList').innerHTML =
+    cardHtml(shepherd) +
+    `<div class="hierarchy-line pl-4 pt-2 space-y-2">${rest.map(cardHtml).join('')}</div>`;
+}
+renderAgents();
+
+/* ---------- ACTIVITY FEED ---------- */
+const feed = document.getElementById('activityFeed');
+const logTemplates = [
+  { agent:'shepherd', color:'var(--intel)', tag:'Shepherd', msgs:[
+    'Reviewed 5 completed drafts, routed 3 to Approval Queue.',
+    'Checked in with SEO Specialist on the weekly ranking audit.',
+    'No blockers across the team today.',
+  ]},
+  { agent:'outreach', color:'#ffb84d', tag:'Outreach', msgs:[
+    'Drafted follow-up for an abandoned resume session — awaiting approval.',
+    'Drafted a partnership intro for a college placement cell.',
+    'Personalization check passed: referencing saved draft, not a scraped profile.',
+  ]},
+  { agent:'data', color:'#7c93ff', tag:'Data Extraction', msgs:[
+    'Logged new opt-in signup from the Free ATS Score Checker.',
+    'Logged an abandoned session at 80% complete.',
+    'Synced placement-cell contact list for 4 colleges.',
+  ]},
+  { agent:'seo', color:'#34e8a0', tag:'SEO', msgs:[
+    'Keyword "free ATS resume checker" moved up to rank #8.',
+    'Generated meta description for /blog/fresher-resume-tips.',
+    'Flagged a new competitor for tracking.',
+  ]},
+  { agent:'growth', color:'#c084fc', tag:'Growth Hacker', msgs:[
+    'Sketched a referral loop: 3 referrals unlocks a premium template.',
+    'Drafted a value-first r/developersIndia post idea.',
+  ]},
+  { agent:'support', color:'#f472b6', tag:'Support', msgs:[
+    'Drafted a reply for a download-issue ticket — awaiting approval.',
+    'Flagged a repeated question for the FAQ page.',
+  ]},
+];
+let feedFilter='all', feedPaused=false, feedCount=0;
+function pad(n){return n.toString().padStart(2,'0');}
+function timestamp(){const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}
+function addLog(){
+  if(feedPaused) return;
+  const bucket = logTemplates[Math.floor(Math.random()*logTemplates.length)];
+  if(feedFilter!=='all' && feedFilter!==bucket.agent) return;
+  const msg = bucket.msgs[Math.floor(Math.random()*bucket.msgs.length)];
+  const line = document.createElement('div');
+  line.className='log-line flex gap-2 items-start';
+  line.dataset.agent = bucket.agent;
+  line.innerHTML = `<span class="text-slate-600 shrink-0">${timestamp()}</span><span class="font-semibold shrink-0 min-w-[100px]" style="color:${bucket.color};">[${bucket.tag}]</span><span class="text-slate-300">${msg}</span>`;
+  feed.appendChild(line);
+  feedCount++;
+  document.getElementById('feedCount').textContent = feedCount;
+  while(feed.children.length>60) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+for(let i=0;i<6;i++) addLog();
+setInterval(addLog, 2200);
+document.querySelectorAll('.feed-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.feed-tab').forEach(b=>{b.classList.remove('text-white','bg-white/10');b.classList.add('text-slate-400');});
+    btn.classList.add('text-white','bg-white/10'); btn.classList.remove('text-slate-400');
+    feedFilter = btn.dataset.filter;
+    feed.querySelectorAll('.log-line').forEach(l=>{l.style.display=(feedFilter==='all'||l.dataset.agent===feedFilter)?'flex':'none';});
+  });
+});
+document.getElementById('pauseFeed').addEventListener('click',(e)=>{
+  feedPaused=!feedPaused;
+  e.currentTarget.innerHTML = feedPaused
+    ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+});
+
+/* ---------- APPROVAL QUEUE ---------- */
+let approvals = [
+  { id:1, agent:'Sales Outreach', target:'TPO — Regional Engineering College', role:'Placement Cell Partnership', channel:'Email', message:`Hi, I run banaocv.in, a free ATS-friendly resume builder. Would your placement cell like free access for this year's graduating batch? Happy to set up a quick call.`, tag:'Placement Cell' },
+  { id:2, agent:'Sales Outreach', target:'Abandoned Session #A3F1', role:'80% complete, no finish', channel:'Email (opt-in)', message:`Hey! Looks like you were almost done with your resume on banaocv.in. Want to pick up right where you left off? Your draft is saved.`, tag:'First-party' },
+  { id:3, agent:'Data Extraction', target:'ATS Score Checker signups', role:'12 new opt-ins this week', channel:'Internal log', message:`12 people used the free ATS Score Checker and opted in for tips. Adding to the nurture list — no outreach without their own signup.`, tag:'Opt-in' },
+  { id:4, agent:'Customer Support', target:'Ticket #482', role:`"My download button isn't working"`, channel:'Email', message:`Hi! Sorry about that — try re-downloading from your dashboard's "My Resumes" tab; it should work in Chrome/Edge. If not, reply here and I'll generate a fresh PDF for you manually.`, tag:'Support' },
+];
+const queueEl = document.getElementById('approvalQueue');
+function renderQueue(){
+  document.getElementById('queueBadge').textContent = approvals.length;
+  document.getElementById('pendingCount').textContent = approvals.length;
+  if(approvals.length===0){
+    queueEl.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center py-10">
+      <div class="w-14 h-14 rounded-full flex items-center justify-center mb-3" style="background:var(--signal-dim);border:1px solid rgba(52,232,160,.3);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" style="color:var(--signal);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div class="text-sm font-semibold text-white">Queue clear</div>
+      <div class="text-xs text-slate-500 mt-1">Nothing waiting on you right now.</div></div>`;
+    return;
+  }
+  queueEl.innerHTML = approvals.map(a=>`
+    <div class="approval-card rounded-xl border border-white/5 bg-white/[0.02] p-4" data-id="${a.id}">
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-white truncate">${a.target}</div>
+          <div class="text-[10px] text-slate-500 truncate">${a.role}</div>
+        </div>
+        <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 tracking-wider" style="color:var(--intel);border-color:rgba(124,147,255,.3);background:var(--intel-dim);">${a.tag}</span>
+      </div>
+      <div class="flex items-center gap-2 text-[10px] text-slate-500 mb-2">
+        <span>${a.agent}</span><span>·</span><span>${a.channel}</span>
+      </div>
+      <div class="text-[12px] text-slate-300 leading-relaxed bg-black/30 rounded-lg p-3 border border-white/5 mb-3">${a.message}</div>
+      <div class="grid grid-cols-3 gap-2">
+        <button data-action="approve" data-id="${a.id}" class="btn-glow btn-signal px-2 py-2 rounded-lg text-[11px] font-medium">Approve</button>
+        <button data-action="edit" data-id="${a.id}" class="btn-glow btn-intel px-2 py-2 rounded-lg text-[11px] font-medium">Edit</button>
+        <button data-action="reject" data-id="${a.id}" class="btn-glow btn-alert px-2 py-2 rounded-lg text-[11px] font-medium">Reject</button>
+      </div>
+    </div>`).join('');
+  queueEl.querySelectorAll('button[data-action]').forEach(btn=>{
+    btn.addEventListener('click',()=>handleApproval(btn.dataset.action, parseInt(btn.dataset.id)));
+  });
+}
+function handleApproval(action,id){
+  const idx = approvals.findIndex(a=>a.id===id);
+  if(idx<0) return;
+  const item = approvals[idx];
+  if(action==='edit'){
+    const newMsg = prompt('Edit message:', item.message);
+    if(newMsg!==null && newMsg.trim()){ approvals[idx].message=newMsg; renderQueue(); showToast('Message updated','intel'); }
+    return;
+  }
+  const card = queueEl.querySelector(`.approval-card[data-id="${id}"]`);
+  card.style.transition='all .3s ease'; card.style.opacity='0';
+  card.style.transform = action==='approve' ? 'translateX(24px)' : 'translateX(-24px)';
+  setTimeout(()=>{
+    approvals.splice(idx,1); renderQueue();
+    showToast(action==='approve' ? `Approved — sent to ${item.target}` : `Rejected — ${item.target}`, action==='approve'?'signal':'alert');
+  },300);
+}
+renderQueue();
+
+/* ---------- TOASTS ---------- */
+function showToast(msg,tone='signal'){
+  const colorMap={signal:'34,232,160',intel:'124,147,255',alert:'255,93,116'};
+  const c = colorMap[tone]||colorMap.signal;
+  const t=document.createElement('div');
+  t.className='glass px-4 py-3 rounded-lg text-sm font-medium min-w-[240px] shadow-2xl';
+  t.style.border=`1px solid rgba(${c},.4)`; t.style.color=`rgb(${c})`;
+  t.style.opacity='0'; t.style.transform='translateY(10px)'; t.style.transition='all .3s';
+  t.textContent=msg;
+  document.getElementById('toastContainer').appendChild(t);
+  requestAnimationFrame(()=>{t.style.opacity='1';t.style.transform='translateY(0)';});
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateY(10px)';setTimeout(()=>t.remove(),300);},3200);
+}
+
+/* ---------- KPI COUNT-UP ---------- */
+document.querySelectorAll('[data-count]').forEach(el=>{
+  const target=parseInt(el.dataset.count); let cur=0; const step=Math.max(1,Math.ceil(target/40));
+  const t=setInterval(()=>{cur+=step; if(cur>=target){cur=target;clearInterval(t);} el.textContent=cur.toLocaleString();},20);
+});
+
+/* ---------- CLOCK + SIDEBAR ---------- */
+setInterval(()=>{document.getElementById('clock').textContent=timestamp();},1000);
+document.getElementById('mobileMenuBtn').addEventListener('click',()=>{document.getElementById('sidebar').classList.toggle('open');});
+
+/* ---------- SETTINGS MODAL ---------- */
+let geminiApiKey = null;
+let isConnected = false;
+function openSettings(){
+  const modal=document.getElementById('settingsModal');
+  modal.classList.remove('hidden'); modal.classList.add('flex');
+  requestAnimationFrame(()=>{
+    const panel=modal.querySelector('.modal-panel');
+    panel.style.transform='scale(1)'; panel.style.opacity='1';
+  });
+}
+function closeSettings(){
+  const modal=document.getElementById('settingsModal');
+  const panel=modal.querySelector('.modal-panel');
+  panel.style.transform='scale(.96)'; panel.style.opacity='0';
+  setTimeout(()=>{modal.classList.add('hidden'); modal.classList.remove('flex');},200);
+}
+document.getElementById('settingsModal').addEventListener('click',(e)=>{ if(e.target.id==='settingsModal') closeSettings(); });
+
+async function testGeminiConnection(){
+  const key = document.getElementById('geminiKeyInput').value.trim();
+  const statusEl = document.getElementById('settingsStatus');
+  const btn = document.getElementById('testConnectionBtn');
+  if(!key){ statusEl.textContent='Paste a key first.'; statusEl.style.color='var(--alert)'; return; }
+  btn.disabled=true; btn.textContent='Testing…'; statusEl.textContent=''; statusEl.style.color='var(--ink-400)';
+  try{
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({contents:[{parts:[{text:"You are Project Shepherd, the orchestrator agent for LeadForge, an AI team running marketing and ops for banaocv.in, a resume builder for freshers. In one short sentence, greet the founder Aditya to confirm you're online and ready."}]}]})
+    });
+    const data = await res.json();
+    if(!res.ok){ throw new Error(data?.error?.message || `Request failed (${res.status})`); }
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Connected, but got an empty response.';
+    geminiApiKey = key; isConnected = true;
+    statusEl.textContent = '✓ ' + text; statusEl.style.color='var(--signal)';
+    updateConnectionUI(true);
+    showToast('Project Shepherd is online','signal');
+    setTimeout(closeSettings, 1400);
+  }catch(err){
+    statusEl.textContent = '✗ ' + err.message; statusEl.style.color='var(--alert)';
+    showToast('Connection failed — check the key','alert');
+  }finally{
+    btn.disabled=false; btn.textContent='Test & Activate';
+  }
+}
+function updateConnectionUI(connected){
+  const dot=document.getElementById('statusDot'), text=document.getElementById('statusText');
+  const roadmapIcon=document.getElementById('roadmapGeminiIcon'), roadmapText=document.getElementById('roadmapGeminiText');
+  if(connected){
+    dot.style.background='var(--signal)'; text.textContent='Shepherd online';
+    roadmapIcon.textContent='✓'; roadmapIcon.style.color='var(--signal)';
+    roadmapText.textContent='Gemini connection'; roadmapText.classList.remove('text-slate-400'); roadmapText.classList.add('text-slate-300');
+    agents[0].status='active'; renderAgents();
+  }
+}
+
+/* ---------- BACKEND STATUS POLLING (Gemini/NVIDIA engine) ---------- */
+let backendUrl = '';
+let pollTimer = null;
+
+function saveBackendUrl(){
+  const val = document.getElementById('backendUrlInput').value.trim().replace(/\/+$/,'');
+  const statusEl = document.getElementById('backendStatus');
+  if(!val){ statusEl.textContent='Paste a URL first.'; statusEl.style.color='var(--alert)'; return; }
+  backendUrl = val;
+  statusEl.textContent='Checking…'; statusEl.style.color='var(--ink-400)';
+  pollBackendStatus();
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollBackendStatus, 8000);
+}
+
+function setEngineState(tone,text){
+  const badge=document.getElementById('engineBadge'), dot=document.getElementById('engineDot'), label=document.getElementById('engineLabel');
+  const map={
+    pending:{bg:'var(--pending-dim)',border:'rgba(255,184,77,.25)',c:'var(--pending)'},
+    intel:{bg:'var(--intel-dim)',border:'rgba(124,147,255,.3)',c:'var(--intel)'},
+    nvidia:{bg:'var(--nvidia-dim)',border:'rgba(118,185,0,.3)',c:'var(--nvidia)'},
+    alert:{bg:'var(--alert-dim)',border:'rgba(255,93,116,.25)',c:'var(--alert)'},
+  };
+  const m=map[tone];
+  badge.style.background=m.bg; badge.style.borderColor=m.border;
+  dot.style.background=m.c; label.style.color=m.c; label.textContent=text;
+}
+
+async function pollBackendStatus(){
+  const statusEl = document.getElementById('backendStatus');
+  if(!backendUrl){ setEngineState('pending','Backend not connected yet'); return; }
+  try{
+    const res = await fetch(backendUrl + '/status');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const provider = data.active_provider;
+    if(provider==='gemini') setEngineState('intel','Running on Gemini');
+    else if(provider==='nvidia') setEngineState('nvidia','Running on NVIDIA (fallback)');
+    else setEngineState('pending','Connected — no runs yet');
+
+    const g = data.gemini||{}, n = data.nvidia||{};
+    const gReq=g.requests||0, gLimit=g.daily_limit||1500, nReq=n.requests||0;
+    document.getElementById('geminiReqCounter').textContent = `${gReq.toLocaleString()} / ${gLimit.toLocaleString()}`;
+    document.getElementById('geminiReqBar').style.width = Math.min(100,(gReq/gLimit)*100)+'%';
+    document.getElementById('nvidiaReqCounter').textContent = `${nReq.toLocaleString()} request${nReq===1?'':'s'}`;
+    document.getElementById('nvidiaReqBar').style.width = Math.min(100, nReq*4)+'%';
+    document.getElementById('tokenCounter').textContent = ((g.tokens||0)+(n.tokens||0)).toLocaleString();
+
+    if(statusEl){ statusEl.textContent='✓ Connected'; statusEl.style.color='var(--signal)'; }
+  }catch(err){
+    setEngineState('alert','Backend unreachable');
+    if(statusEl){ statusEl.textContent='✗ '+err.message; statusEl.style.color='var(--alert)'; }
+  }
+}
+pollBackendStatus();
+</script>
+</body>
+</html>
