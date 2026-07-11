@@ -12,7 +12,16 @@ from llm_router import router, GEMINI_MODEL, NVIDIA_MODEL
 
 
 def _gemini_llm():
-    return LLM(model=f"gemini/{GEMINI_MODEL}", api_key=os.environ.get("GEMINI_API_KEY", ""))
+    # CrewAI's "native" gemini/ integration has a long history of bugs across
+    # litellm versions (mangled model prefixes, "LLM Provider NOT provided"
+    # errors, etc. — see crewAIInc/crewai issues #2645, #3702, #3109).
+    # CrewAI's own docs recommend routing through Gemini's OpenAI-compatible
+    # endpoint instead, which is far more reliable — same pattern as NVIDIA below.
+    return LLM(
+        model=f"openai/{GEMINI_MODEL}",
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        api_key=os.environ.get("GEMINI_API_KEY", ""),
+    )
 
 
 def _nvidia_llm():
@@ -90,7 +99,7 @@ def _build_agent(key: str, llm: LLM) -> Agent:
 def run_agent_task(agent_key: str, task_description: str, expected_output: str) -> dict:
     """Runs one task on one agent. Tries Gemini first, falls back to NVIDIA
     on failure. Returns {"output": str, "provider": "gemini"|"nvidia"}."""
-    last_error = None
+    errors = {}
     for provider, build_llm in (("gemini", _gemini_llm), ("nvidia", _nvidia_llm)):
         try:
             agent = _build_agent(agent_key, build_llm())
@@ -107,7 +116,10 @@ def run_agent_task(agent_key: str, task_description: str, expected_output: str) 
 
             return {"output": str(result), "provider": provider}
         except Exception as e:
-            last_error = f"{provider}: {e}"
-            router.last_error = last_error
+            errors[provider] = str(e)
+            router.last_error = f"{provider}: {e}"
             continue
-    raise RuntimeError(f"Both providers failed. Last error: {last_error}")
+    # Both failed — surface both reasons clearly instead of only the last one.
+    detail = " | ".join(f"{p}: {msg}" for p, msg in errors.items())
+    router.last_error = detail
+    raise RuntimeError(f"Both providers failed — {detail}")
