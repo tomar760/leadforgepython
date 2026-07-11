@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from llm_router import router
 from agents_config import AGENT_DEFINITIONS, run_agent_task
+from activity import start_scheduler, get_activity
 
 app = FastAPI(title="LeadForge Backend")
 
@@ -25,6 +26,11 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def _on_startup():
+    start_scheduler()  # runs Growth Hacker + Content Creator now, then every 10 min
+
+
 @app.get("/")
 def root():
     return {"service": "LeadForge backend", "status": "running"}
@@ -33,6 +39,11 @@ def root():
 @app.get("/status")
 def status():
     return router.status()
+
+
+@app.get("/activity")
+def activity():
+    return get_activity()
 
 
 @app.get("/agents")
