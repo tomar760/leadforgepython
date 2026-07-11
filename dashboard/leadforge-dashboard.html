@@ -143,6 +143,8 @@
             <span class="text-slate-400">Tokens used today</span>
             <span id="tokenCounter" class="text-slate-300 mono">0</span>
           </div>
+          <button id="testAgentRunBtn" onclick="testRealAgentRun()" class="btn-glow btn-signal w-full mt-1 px-3 py-2 rounded-lg text-[11px] font-medium">Run a real test (Shepherd)</button>
+          <div id="testAgentRunResult" class="text-[11px] text-slate-400 leading-relaxed"></div>
         </div>
       </div>
     </aside>
@@ -634,6 +636,39 @@ async function pollBackendStatus(){
   }
 }
 pollBackendStatus();
+
+async function testRealAgentRun(){
+  const btn = document.getElementById('testAgentRunBtn');
+  const resultEl = document.getElementById('testAgentRunResult');
+  if(!backendUrl){
+    resultEl.textContent = 'Pehle Settings mein Backend URL save karo.';
+    resultEl.style.color = 'var(--alert)';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Shepherd is thinking…';
+  resultEl.textContent = ''; resultEl.style.color = 'var(--ink-400)';
+  try{
+    const res = await fetch(backendUrl + '/agents/shepherd/run', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        task: "Give Aditya a one-sentence status update confirming the LeadForge team is online and ready.",
+        expected_output: "One short, friendly sentence."
+      })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+    resultEl.innerHTML = `<span style="color:var(--signal)">✓ Real response via ${data.provider}:</span><br>${data.output}`;
+    showToast('Shepherd responded for real 🎉','signal');
+    pollBackendStatus();
+  }catch(err){
+    resultEl.textContent = '✗ ' + err.message;
+    resultEl.style.color = 'var(--alert)';
+    showToast('Test run failed — see sidebar','alert');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Run a real test (Shepherd)';
+  }
+}
 </script>
 </body>
 </html>
